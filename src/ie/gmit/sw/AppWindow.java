@@ -1,46 +1,53 @@
 package ie.gmit.sw;
 
-import javafx.application.Application;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleIntegerProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.value.ObservableValue;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.control.TableColumn.CellDataFeatures;
-import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
-import javafx.stage.Stage;
-import javafx.util.Callback;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
+import java.util.Scanner;
+
+import javafx.geometry.*;
+import javafx.scene.*;
+import javafx.scene.control.*;
+import javafx.scene.control.TableColumn.*;
+import javafx.application.*;
+import javafx.beans.property.*;
+import javafx.beans.value.*;
+import javafx.collections.*;
+import javafx.stage.*;
+import javafx.scene.layout.*;
+import javafx.util.*;
 
 import one.microstream.storage.types.EmbeddedStorage;
 import one.microstream.storage.types.EmbeddedStorageManager;
 
+/**
+ * The App Window Class. The app window class handles all transactions of
+ * the provided jar file. It uses microstream's embeddedstorage manager to
+ * store the retreived data into a data folder.
+ * Note: files inside the data folder should be manually deleted whenever
+ * this program is run
+ *
+ *  @author Nathan Garrihy
+ *  @version 1.0 Beta
+ *  @since 2021-01-08
+ */
+
 public class AppWindow extends Application {
     private List<Class> root = new ArrayList<>();
-    private EmbeddedStorageManager db = null; // The storage manager is the database...
+    private EmbeddedStorageManager db = null; // Microstream's embeddedstoragemanager = the database
 
-    private ObservableList<JarRecord> customers; //The Model - a list of observers.
-    private TableView<JarRecord> tv; //The View - a composite of GUI components
-    private TextField txtFile; //A control, part of the View and a leaf node.
+    private ObservableList<Jrec> jrecs; // The Model (a list of observers)
+    private TableView<Jrec> tv; // The View (a composite of GUI components)
+    private TextField txtFile; // A control (part of the View and a leaf node)
 
     @Override
-    public void start(Stage stage) throws Exception { //This is a ***Template Method***
-        customers = InitializeCustomers(); //Get the Model
+    // Template Method
+    public void start(Stage stage) throws Exception {
+        // Set up the model
+        jrecs = InitializeJrecs();
         db = EmbeddedStorage.start(root, Paths.get("./data"));
 
         /*
@@ -58,10 +65,9 @@ public class AppWindow extends Application {
          * practice, I find that XML slows down development to a crawl and I prefer to
          * programme the GUI from scratch, as it's much quicker, even if it is verbose.
          */
-        stage.setTitle("GMIT - B.Sc. in Computing (Software Development)");
+        stage.setTitle("Nathan Garrihy - G00354922 - GMIT - B.Sc. in Computing (Software Development)");
         stage.setWidth(800);
         stage.setHeight(600);
-
 
         /* The following is an example of the ** Observer Pattern**. Use a lambda
          * expression to plant an EventHandler<WindowEvent> observer on the stage
@@ -82,6 +88,7 @@ public class AppWindow extends Application {
          * Pattern**. The Scene object is the Context and the layout container (AnchorPane,
          * BorderPanel, VBox, FlowPane etc) is a concrete strategy.
          */
+
         VBox box = new VBox();
         box.setPadding(new Insets(10));
         box.setSpacing(8);
@@ -96,10 +103,10 @@ public class AppWindow extends Application {
         btnQuit.setOnAction(e -> System.exit(0)); //Plant an observer on the button
         toolBar.getItems().add(btnQuit); //Add to the parent node and build the tree
 
-        Button btnAdd = new Button("Add"); //A Leaf node
+        Button btnAdd = new Button("Save"); //A Leaf node
         btnAdd.setOnAction(e -> { //Plant an observer on the button
             /*
-             * For the sake of simplicity of explanation, the instance of Customer is
+             * For the sake of simplicity of explanation, the instance of Jrec is
              * hard-wired into the application. The important things to note are the
              * following:
              *
@@ -113,51 +120,38 @@ public class AppWindow extends Application {
         });
         toolBar.getItems().add(btnAdd); //Add to the parent node and build the tree
 
-
         Button btnDelete = new Button("Delete"); //A Leaf node
         btnDelete.setOnAction(e -> { //Plant an observer on the button
             /*
-             * Get the selected Customer object from the View (TableView) and
+             * Get the selected Jar Record object from the View (TableView) and
              * remove it from the Model (ObservableList). Do not try to update
              * the view directly.
              */
-
-            JarRecord c = tv.getSelectionModel().getSelectedItem();
-            customers.remove(c);
+            Jrec c = tv.getSelectionModel().getSelectedItem();
+            jrecs.remove(c);
         });
         toolBar.getItems().add(btnDelete); //Add to the parent node and build the tree
-
         /*
          * Add all the sub trees of nodes to the parent node and build the tree
          */
         box.getChildren().add(getFileChooserPane(stage)); //Add the sub tree to the main tree
         box.getChildren().add(getTableView()); //Add the sub tree to the main tree
         box.getChildren().add(toolBar); //Add the sub tree to the main tree
-        //box.getChildren().add(new PolyPanel());
         // Display the window
         stage.show();
         stage.centerOnScreen();
     }
 
-    void storeData() {
-        try {
-            db.storeRoot();
-            db.shutdown();
-        }	catch (NoClassDefFoundError | Exception e) {
-            // Exception caught
-        }
-    }
+    /**
+     *
+     * This method builds a TitledPane containing the controls for the file chooser
+     * part of the application. We could have created a specialised instance of the
+     * class TitledPane using inheritance and moved all of the method into its own
+     * class (OCP). Gets the file chooser pane.
 
-    private ObservableList<JarRecord> InitializeCustomers(){
-        customers = FXCollections.observableArrayList();
-        return customers;
-    }
-
-    /*
-     *  This method builds a TitledPane containing the controls for the file chooser
-     *  part of the application. We could have created a specialised instance of the
-     *  class TitledPane using inheritance and moved all of the method into its own
-     *  class (OCP).
+     * @param stage  the stage
+     * @return the file chooser pane
+     * @throws NoClassDefFoundError
      */
     private TitledPane getFileChooserPane(Stage stage) throws NoClassDefFoundError, ClassNotFoundException {
         VBox panel = new VBox(); //** A concrete strategy ***
@@ -177,59 +171,54 @@ public class AppWindow extends Application {
         btnProcess.setOnAction(e -> { //Plant an observer on the button
             File f = new File(txtFile.getText());
             System.out.println("[INFO] Processing file " + f.getName());
-			JarInputStream in = null;
-			try {
-				in = new JarInputStream(new FileInputStream(new File(f.toString())));
-			} catch (IOException ioException) {
-				ioException.printStackTrace();
-			}
-			JarEntry next = null;
-			try {
-				next = in.getNextJarEntry();
-			} catch (IOException ioException) {
-				ioException.printStackTrace();
-			}
-			while (next != null) {
-				if (next.getName().endsWith(".class")) {
-					String name = next.getName().replaceAll("/", "\\.");
-					name = name.replaceAll(".class", "");
-					if (!name.contains("$")) name.substring(0, name.length() - ".class".length());
 
-					Class cls;
+            JarInputStream in = null;
+            try {
+                in = new JarInputStream(new FileInputStream(new File(f.toString())));
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+            JarEntry next = null;
+            try {
+                next = in.getNextJarEntry();
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+            while (next != null) {
+                if (next.getName().endsWith(".class")) {
+                    String name = next.getName().replaceAll("/", "\\.");
+                    name = name.replaceAll(".class", "");
+                    if (!name.contains("$")) name.substring(0, name.length() - ".class".length());
 
-					try {
-						cls = Class.forName(name);
-						String className = cls.getName();
-						String packageName = cls.getPackageName();
-						boolean isInterface = cls.isInterface();
-						int sloc = getSLOC(in);
+                    Class cls;
+                    try {
+                        cls = Class.forName(name);
+                        root.add(cls);
 
-						root.add(cls);
-                        db.database();
+                        String classname = cls.getName();
+                        String packageName = cls.getPackageName().toString();
+                        boolean isInteface = cls.isInterface();
+                        int SLOC = getSloc(in);
 
-						JarRecord classRecord = new JarRecord(className, packageName, isInterface, sloc);
+                        jrecs.add(new Jrec(classname, packageName, isInteface, SLOC));
 
-                        customers.add(
-                                new JarRecord(className, packageName, isInterface, sloc)
-                        );
-
-					} catch (ClassNotFoundException classNotFoundException) {
-						classNotFoundException.printStackTrace();
-					} catch (NoClassDefFoundError noClassDefFoundError)
-					{
-					    noClassDefFoundError.printStackTrace();
-					} catch (FileNotFoundException fileNotFoundException) {
+                    } catch (ClassNotFoundException classNotFoundException) {
+                        classNotFoundException.printStackTrace();
+                    }catch (NoClassDefFoundError noClassDefFoundError)
+                    {
+                        //catch the no class defer error
+                    } catch (FileNotFoundException fileNotFoundException) {
                         fileNotFoundException.printStackTrace();
                     }
                     storeData();
-					System.out.println(name);
-				}
-				try {
-					next = in.getNextJarEntry();
-				} catch (IOException ioException) {
-					ioException.printStackTrace();
-				}
-			}
+                    System.out.println(name);
+                }
+                try {
+                    next = in.getNextJarEntry();
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
+                }
+            }
         });
 
         ToolBar tb = new ToolBar(); //A composite node
@@ -244,49 +233,90 @@ public class AppWindow extends Application {
         return tp;
     }
 
-    private void query(){
-        root.stream().forEach(System.out::println);;
-    }
-
-    private int getSLOC(JarInputStream jis) throws FileNotFoundException {
+    /**
+     *
+     * Iterates through the code counting and returning the
+     * total number of lines of source code
+     *
+     * @param jarInputStream the jarInputStream
+     * @return the s.l.o.c.
+     * @throws FileNotFoundException
+     */
+    private int getSloc(JarInputStream jarInputStream) throws FileNotFoundException{
         int count = 0;
-
         try {
+            // create a new file object
             // create an object of Scanner
             // associated with the file
-            Scanner sc = new Scanner(jis);
-
+            Scanner sc = new Scanner(jarInputStream);
             // read each line and
             // count number of lines
-            while (sc.hasNextLine()) {
+            while(sc.hasNextLine()) {
                 sc.nextLine();
                 count++;
             }
-
         } catch (Exception e) {
             e.getStackTrace();
         }
-        return count;
+        return  count;
     }
 
     /*
-     * This method builds a table to display the customer details. This View
+     * This method builds a table to display the jrec details. This View
      * could also have been encapsulated inside its own class using the signature
      *
-     * public class CustomerTableView extends TableView<Customer>
+     * public class JrecTableView extends TableView<Jrec>
      *
      */
-    private TableView<JarRecord> getTableView() {
-        /*
-         * The next line is **very important**. We configure a View (TableView) with
-         * a Model (ObservableList<Customer>). The Model is observable and will
-         * propagate any changes to it to the View or Views that render it.
-         */
-        tv = new TableView<>(customers); //A TableView is a composite node
+
+    /**
+     *
+     * Initialize jar records
+     *
+     * @return ObservableList<Jrec> (list from jar file)
+     */
+    private ObservableList<Jrec> InitializeJrecs(){
+        jrecs = FXCollections.observableArrayList();
+        return jrecs;
+    }
+
+    /**
+     * Store data() method
+     *
+     * stores data to microstream's embeddedstoragemanager database
+     */
+    void storeData() {
+        try {
+            db.storeRoot();
+            db.shutdown();
+        }    catch (NoClassDefFoundError | Exception e) {
+            System.out.println("Exception in storeData()");
+        }
+    }
+
+    /**
+     * Query is used to iterate over the list of classes,
+     * returning a sequential Stream with this list as its source.
+     */
+    void query(){
+        root.stream().forEach(System.out::println);;
+    }
+
+    /**
+     *
+     * Gets the table view
+     *
+     * @return the table view
+     */
+    private TableView<Jrec> getTableView() {
+
+        //The next line is **very important**. We configure a View (TableView) with
+        //a Model (ObservableList<Jrec>).
+        tv = new TableView<>(jrecs); //A TableView is a composite node
         tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY); //Stretch columns to fit the window
 
         /*
-         *  Create a TableColumn from the class Customer that displays some attribute
+         *  Create a TableColumn from the class Jrec that displays some attribute
          *  as a String. This field is Observable and the method call() will be fired
          *  when the table is being refreshed or when the model is updated. The instance
          *  of the interface Callback is implemented as an anonymous inner class and acts
@@ -295,41 +325,70 @@ public class AppWindow extends Application {
          *  notify() method in the Observer Pattern.
          */
 
-        //Creates an observable table column from a String field extracted from the Customer class
-        TableColumn<JarRecord, String> name = new TableColumn<>("Name");
-        name.setCellValueFactory(new Callback<CellDataFeatures<JarRecord, String>, ObservableValue<String>>() {
-            public ObservableValue<String> call(CellDataFeatures<JarRecord, String> p) {
-                return new SimpleStringProperty(p.getValue().name());
+        /**
+         *
+         * Call for the name of the class
+         *
+         * @param the column class name
+         * @param p the String
+         * @return ObservableValue<String>
+         */
+        TableColumn<Jrec, String> className = new TableColumn<>("Class Name");
+        className.setCellValueFactory(new Callback<CellDataFeatures<Jrec, String>, ObservableValue<String>>() {
+            public ObservableValue<String> call(CellDataFeatures<Jrec, String> p) {
+                return new SimpleStringProperty(p.getValue().className());
             }
         });
 
-        //Creates an observable table column from a String field extracted from the Customer class
-		TableColumn<JarRecord, String> pack = new TableColumn<>("Package");
-		pack.setCellValueFactory(new Callback<CellDataFeatures<JarRecord, String>, ObservableValue<String>>() {
-			public ObservableValue<String> call(CellDataFeatures<JarRecord, String> p) {
-				return new SimpleStringProperty(p.getValue().pack().toString());
-			}
-		});
+        /**
+         *
+         * Call for the name of the package
+         *
+         * @param the column package name
+         * @param p the String
+         * @return ObservableValue<String>
+         */
+        TableColumn<Jrec, String> packageName = new TableColumn<>("Package Name");
+        packageName.setCellValueFactory(new Callback<CellDataFeatures<Jrec, String>, ObservableValue<String>>() {
+            public ObservableValue<String> call(CellDataFeatures<Jrec, String> p) {
+                return new SimpleStringProperty(p.getValue().packageName().toString());
+            }
+        });
 
-        //Creates an observable table column from an Image attribute of the Customer class
-		TableColumn<JarRecord, Boolean> isInterface = new TableColumn<>("Interface");
-		isInterface.setCellValueFactory(new Callback<CellDataFeatures<JarRecord, Boolean>, ObservableValue<Boolean>>() {
-			public ObservableValue<Boolean> call(CellDataFeatures<JarRecord, Boolean> p) {
-				return new SimpleBooleanProperty(p.getValue().bool());
-			}
-		});
+        /**
+         *
+         * Call for boolean telling whether the file is an interface or not
+         *
+         * @param the column isInterface
+         * @param p the boolean
+         * @return ObservableValue<Boolean>
+         */
+        TableColumn<Jrec, Boolean> isInterface = new TableColumn<>("isInterface");
+        isInterface.setCellValueFactory(new Callback<CellDataFeatures<Jrec, Boolean>, ObservableValue<Boolean>>() {
+            public ObservableValue<Boolean> call(CellDataFeatures<Jrec, Boolean> p) {
+                return new SimpleBooleanProperty(p.getValue().isInterface());
+            }
+        });
 
-        TableColumn<JarRecord, Number> sloc = new TableColumn<>("S.L.O.C");
-        sloc.setCellValueFactory(new Callback<CellDataFeatures<JarRecord, Number>, ObservableValue<Number>>() {
-            public ObservableValue<Number> call(CellDataFeatures<JarRecord, Number> p) {
+        /**
+         *
+         * Call for the total number of Source Lines of Code in the file
+         *
+         * @param the column sloc
+         * @param p the number
+         * @return ObservableValue<Number>
+         */
+        TableColumn<Jrec, Number> sloc = new TableColumn<>("S.L.O.C");
+        sloc.setCellValueFactory(new Callback<CellDataFeatures<Jrec, Number>, ObservableValue<Number>>() {
+            public ObservableValue<Number> call(CellDataFeatures<Jrec, Number> p) {
                 return new SimpleIntegerProperty(p.getValue().sloc());
             }
         });
 
-        tv.getColumns().add(name); //Add name to the tree
-        tv.getColumns().add(pack); //Add pack to the tree
-        tv.getColumns().add(isInterface);  //Add bool to the tree
-        tv.getColumns().add(sloc);  //Add source lines of code to the tree
+        tv.getColumns().add(className); //Add class name to the tree
+        tv.getColumns().add(packageName);  //Add package name to the tree
+        tv.getColumns().add(isInterface); // Add interface boolean of the tree
+        tv.getColumns().add(sloc); // Add source lines of code to the tree
         return tv;
     }
 }
